@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"encoding/xml"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -14,7 +15,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"errors"
 )
 
 // http://nominatim.openstreetmap.org/reverse?format=json&lat=47.07038573920726776123046875&lon=8.19601108320057392120361328125&zoom=18&addressdetails=1
@@ -48,7 +48,7 @@ import (
 
 type Query struct {
 	XMLName xml.Name `xml:"gpx"`
-	Tracks  []Track  `xml:"trk"`
+	Track   Track    `xml:"trk"`
 }
 
 type Track struct {
@@ -92,40 +92,38 @@ func run(file string) error {
 	outputfile := strings.TrimSuffix(file, "gpx") + "csv"
 	createFile(outputfile)
 
-	f, err := os.OpenFile(outputfile, os.O_APPEND | os.O_WRONLY, 0600)
+	f, err := os.OpenFile(outputfile, os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
 		panic(err)
 	}
 	defer f.Close()
 
-	for _, track := range q.Tracks {
-		for _, t := range track.TrackSegments {
-			totalTrackPoints := len(t.TrackPoints)
-			f.WriteString("date,lat,lon,ele,temp,Road,Village,City,Town,City2,Neighbourhood,State,Postcode,Country,DisplayName,\n")
-			for i, trackPoint := range t.TrackPoints {
-				if i % 100 != 0 {
-					continue
-				}
-
-				log.Printf("%d/%d\t%+v", i, totalTrackPoints, trackPoint)
-
-				u, err := url.Parse("http://nominatim.openstreetmap.org/reverse?format=json&zoom=18&addressdetails=1")
-				if err != nil {
-					log.Fatal(err)
-				}
-				q := u.Query()
-				q.Set("lat", floatToString(trackPoint.Lat))
-				q.Set("lon", floatToString(trackPoint.Lon))
-				u.RawQuery = q.Encode()
-
-				var res Result
-				err = getJson(u.String(), &res)
-				if err != nil {
-					log.Fatal(err)
-				}
-
-				printCSV(f, trackPoint, res)
+	for _, t := range q.Track.TrackSegments {
+		totalTrackPoints := len(t.TrackPoints)
+		f.WriteString("date,lat,lon,ele,temp,Road,Village,City,Town,City2,Neighbourhood,State,Postcode,Country,DisplayName,\n")
+		for i, trackPoint := range t.TrackPoints {
+			if i%100 != 0 {
+				continue
 			}
+
+			log.Printf("%d/%d\t%+v", i, totalTrackPoints, trackPoint)
+
+			u, err := url.Parse("http://nominatim.openstreetmap.org/reverse?format=json&zoom=18&addressdetails=1")
+			if err != nil {
+				log.Fatal(err)
+			}
+			q := u.Query()
+			q.Set("lat", floatToString(trackPoint.Lat))
+			q.Set("lon", floatToString(trackPoint.Lon))
+			u.RawQuery = q.Encode()
+
+			var res Result
+			err = getJson(u.String(), &res)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			printCSV(f, trackPoint, res)
 		}
 	}
 
