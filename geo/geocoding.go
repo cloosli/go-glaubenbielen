@@ -7,6 +7,8 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"golang.org/x/text/transform"
+	"golang.org/x/text/unicode/norm"
 	"log"
 	"net/http"
 	"net/url"
@@ -15,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 )
 
 // http://nominatim.openstreetmap.org/reverse?format=json&lat=47.07038573920726776123046875&lon=8.19601108320057392120361328125&zoom=18&addressdetails=1
@@ -89,7 +92,12 @@ func run(file string) error {
 		return err
 	}
 
-	outputfile := strings.TrimSuffix(file, "gpx") + "csv"
+	var outputfile string
+	if q.Track.Name != "" && len(q.Track.Name) > 3 {
+		outputfile = NormalizeText(q.Track.Name) + ".csv"
+	} else {
+		outputfile = strings.TrimSuffix(file, "gpx") + "csv"
+	}
 	createFile(outputfile)
 
 	f, err := os.OpenFile(outputfile, os.O_APPEND|os.O_WRONLY, 0600)
@@ -198,6 +206,15 @@ func getJson(url string, target interface{}) error {
 	defer r.Body.Close()
 
 	return json.NewDecoder(r.Body).Decode(target)
+}
+
+func NormalizeText(s string) string {
+	isMn := func(r rune) bool {
+		return !(unicode.IsLetter(r) || unicode.IsDigit(r))
+	}
+	tf := transform.Chain(norm.NFD, transform.RemoveFunc(isMn), norm.NFC)
+	name, _, _ := transform.String(tf, s)
+	return name
 }
 
 func main() {
