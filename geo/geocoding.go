@@ -7,47 +7,23 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"golang.org/x/text/transform"
-	"golang.org/x/text/unicode/norm"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
-	"unicode"
+
+	"github.com/cloosli/go-glaubenbielen/util"
 )
 
-// http://nominatim.openstreetmap.org/reverse?format=json&lat=47.07038573920726776123046875&lon=8.19601108320057392120361328125&zoom=18&addressdetails=1
-// const xml = `<?xml version="1.0" encoding="UTF-8"?>
-//<gpx creator="Garmin Connect" version="1.1"
-//  xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/11.xsd"
-//  xmlns="http://www.topografix.com/GPX/1/1"
-//  xmlns:ns3="http://www.garmin.com/xmlschemas/TrackPointExtension/v1"
-//  xmlns:ns2="http://www.garmin.com/xmlschemas/GpxExtensions/v3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-//  <metadata>
-//    <link href="connect.garmin.com">
-//      <text>Garmin Connect</text>
-//    </link>
-//    <time>2016-07-10T04:50:18.000Z</time>
-//  </metadata>
-//  <trk>
-//    <name>Glaubenbielen</name>
-//    <type>cycling</type>
-//    <trkseg>
-//      <trkpt lat="47.26096071302890777587890625" lon="7.82374846749007701873779296875">
-//        <ele>427.399993896484375</ele>
-//        <time>2016-07-10T04:50:18.000Z</time>
-//        <extensions>
-//          <ns3:TrackPointExtension>
-//            <ns3:atemp>19.0</ns3:atemp>
-//            <ns3:hr>90</ns3:hr>
-//            <ns3:cad>0</ns3:cad>
-//          </ns3:TrackPointExtension>
-//        </extensions>
-//      </trkpt>`
+var (
+	flagFilename string
+	flagOutput   string
+	flagDebug    bool
+	flagLocal    bool
+)
 
 type Query struct {
 	XMLName xml.Name `xml:"gpx"`
@@ -72,13 +48,13 @@ type TrackPoint struct {
 	Temp string    `xml:"extensions>TrackPointExtension>atemp"`
 }
 
-func run(file string) error {
+func run() error {
 
-	if !strings.HasSuffix(file, "gpx") {
+	if !strings.HasSuffix(flagFilename, "gpx") {
 		return errors.New("filename: not a valid gpx file")
 	}
 
-	xmlFile, err := os.Open(file)
+	xmlFile, err := os.Open(flagFilename)
 	if err != nil {
 		fmt.Println("Error opening file:", err)
 		return err
@@ -92,15 +68,16 @@ func run(file string) error {
 		return err
 	}
 
-	var outputfile string
-	if q.Track.Name != "" && len(q.Track.Name) > 3 {
-		outputfile = NormalizeText(q.Track.Name) + ".csv"
-	} else {
-		outputfile = strings.TrimSuffix(file, "gpx") + "csv"
+	if flagOutput == "" {
+		if q.Track.Name != "" && len(q.Track.Name) > 3 {
+			flagOutput = util.NormalizeText(q.Track.Name) + ".csv"
+		} else {
+			flagOutput = strings.TrimSuffix(flagFilename, "gpx") + "csv"
+		}
 	}
-	createFile(outputfile)
+	createFile(flagOutput)
 
-	f, err := os.OpenFile(outputfile, os.O_APPEND|os.O_WRONLY, 0600)
+	f, err := os.OpenFile(flagOutput, os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
 		panic(err)
 	}
@@ -113,7 +90,7 @@ func run(file string) error {
 		totalTrackPoints := len(t.TrackPoints)
 		f.WriteString("date,lat,lon,ele,temp,Road,Village,City,Town,City2,Neighbourhood,State,Postcode,Country,DisplayName,\n")
 		for i, trackPoint := range t.TrackPoints {
-			if i%100 != 0 {
+			if i%1000 != 0 {
 				continue
 			}
 
@@ -150,10 +127,13 @@ func run(file string) error {
 		fmt.Print("\n\n")
 	}
 
+	fmt.Printf("CSV file created > %s\n", f.Name())
+
 	return nil
 }
 
 func createFile(p string) {
+	util.CreatePathTo(p)
 	f, err := os.Create(p)
 	if err != nil {
 		panic(err)
@@ -227,28 +207,19 @@ func getJson(url string, target interface{}) error {
 	return json.NewDecoder(r.Body).Decode(target)
 }
 
-func NormalizeText(s string) string {
-	isMn := func(r rune) bool {
-		return !(unicode.IsLetter(r) || unicode.IsDigit(r))
-	}
-	tf := transform.Chain(norm.NFD, transform.RemoveFunc(isMn), norm.NFC)
-	name, _, _ := transform.String(tf, s)
-	return name
-}
-
 func main() {
-	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: %s <path-to-file.gpx>\n", filepath.Base(os.Args[0]))
-	}
+	flag.BoolVar(&flagDebug, "debug", false, "show HTTP traffic")
+	flag.BoolVar(&flagLocal, "local", false, "Use local city list file")
+	flag.StringVar(&flagFilename, "i", "", "Input file: -i <path-to-file.gpx>")
+	flag.StringVar(&flagOutput, "o", "", "Output file: -o <path-to-file.csv>")
 	flag.Parse()
 
-	args := flag.Args()
-	if len(args) != 1 {
+	if flagFilename == "" {
 		flag.Usage()
 		os.Exit(1)
 	}
 
-	if err := run(args[0]); err != nil {
+	if err := run(); err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err.Error())
 		os.Exit(1)
 	}
