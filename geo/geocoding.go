@@ -21,6 +21,7 @@ var (
 	flagOutput   string
 	flagDebug    bool
 	flagLocal    bool
+	flagSteps    int
 )
 
 func run() error {
@@ -56,11 +57,11 @@ func run() error {
 		totalTrackPoints := len(t.TrackPoints)
 		f.WriteString("date,lat,lon,ele,temp,Road,Village,City,Town,City2,Neighbourhood,State,Postcode,Country,DisplayName,\n")
 		for i, trackPoint := range t.TrackPoints {
-			if i%1000 != 0 {
+			if i%flagSteps != 0 && i+1 < totalTrackPoints {
 				continue
 			}
 
-			log.Printf("%d/%d\t%+v", i, totalTrackPoints, trackPoint)
+			log.Printf("%d/%d\t%+v", i+1, totalTrackPoints, trackPoint)
 
 			u, err := url.Parse("http://nominatim.openstreetmap.org/reverse?format=json&zoom=18&addressdetails=1")
 			if err != nil {
@@ -139,6 +140,7 @@ type Result struct {
 	DisplayName string `json:"display_name"`
 	Address     Address
 }
+
 type Address struct {
 	Village       string
 	Road          string
@@ -161,11 +163,18 @@ func getJson(url string, target interface{}) error {
 }
 
 func main() {
-	flag.BoolVar(&flagDebug, "debug", false, "show HTTP traffic")
+	flag.BoolVar(&flagDebug, "v", false, "verbose logging")
 	flag.BoolVar(&flagLocal, "local", false, "Use local city list file")
 	flag.StringVar(&flagFilename, "i", "", "Input file: -i <path-to-file.gpx>")
 	flag.StringVar(&flagOutput, "o", "", "Output file: -o <path-to-file.csv>")
+	flag.IntVar(&flagSteps, "s", 100, "Check every x steps the location")
+	showUsage := flag.Bool("h", false, "Show usage")
 	flag.Parse()
+
+	if *showUsage {
+		flag.Usage()
+		os.Exit(0)
+	}
 
 	if flagFilename == "" {
 		flag.Usage()
