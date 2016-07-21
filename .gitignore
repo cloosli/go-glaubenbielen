@@ -113,5 +113,6 @@ _testmain.go
 
 # go-glaubenbielen
 *.csv
+geocoding
 
 
