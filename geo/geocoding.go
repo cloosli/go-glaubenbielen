@@ -13,9 +13,9 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/cloosli/go-glaubenbielen/util"
+	gpx "github.com/cloosli/go-glaubenbielen/xml"
 )
 
 var (
@@ -24,29 +24,6 @@ var (
 	flagDebug    bool
 	flagLocal    bool
 )
-
-type Query struct {
-	XMLName xml.Name `xml:"gpx"`
-	Track   Track    `xml:"trk"`
-}
-
-type Track struct {
-	Name          string         `xml:"name"`
-	Type          string         `xml:"type"`
-	TrackSegments []TrackSegment `xml:"trkseg"`
-}
-
-type TrackSegment struct {
-	TrackPoints []TrackPoint `xml:"trkpt"`
-}
-
-type TrackPoint struct {
-	Lat  float64   `xml:"lat,attr"`
-	Lon  float64   `xml:"lon,attr"`
-	Date time.Time `xml:"time"`
-	Ele  float64   `xml:"ele"` // Höhe in m
-	Temp string    `xml:"extensions>TrackPointExtension>atemp"`
-}
 
 func run() error {
 
@@ -61,7 +38,7 @@ func run() error {
 	}
 	defer xmlFile.Close()
 
-	var q Query
+	var q gpx.Query
 	decoder := xml.NewDecoder(xmlFile)
 	err = decoder.Decode(&q)
 	if err != nil {
@@ -141,7 +118,7 @@ func createFile(p string) {
 	defer f.Close()
 }
 
-func printCSV(f *os.File, tp TrackPoint, res Result) {
+func printCSV(f *os.File, tp gpx.TrackPoint, res Result) {
 	addr := res.Address
 	var b bytes.Buffer
 	b.WriteString(fmt.Sprintf("%v,", tp.Date))
