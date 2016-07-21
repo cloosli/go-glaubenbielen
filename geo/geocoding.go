@@ -106,6 +106,9 @@ func run(file string) error {
 	}
 	defer f.Close()
 
+	//set := make(map[string] struct{})
+	set := make(map[string]bool)
+
 	for _, t := range q.Track.TrackSegments {
 		totalTrackPoints := len(t.TrackPoints)
 		f.WriteString("date,lat,lon,ele,temp,Road,Village,City,Town,City2,Neighbourhood,State,Postcode,Country,DisplayName,\n")
@@ -131,8 +134,20 @@ func run(file string) error {
 				log.Fatal(err)
 			}
 
+			city := GetBestCity(res.Address)
+			set[city] = true
+
 			printCSV(f, trackPoint, res)
 		}
+	}
+
+	if len(set) > 0 {
+		fmt.Println("\nAll cities:")
+		for key := range set {
+			fmt.Print(key)
+			fmt.Print(", ")
+		}
+		fmt.Print("\n\n")
 	}
 
 	return nil
@@ -158,17 +173,7 @@ func printCSV(f *os.File, tp TrackPoint, res Result) {
 	b.WriteString(fmt.Sprintf("%q,", addr.Village))
 	b.WriteString(fmt.Sprintf("%q,", addr.City))
 	b.WriteString(fmt.Sprintf("%q,", addr.Town))
-	if addr.Village != "" {
-		b.WriteString(fmt.Sprintf("%q,", addr.Village))
-	} else if addr.City != "" {
-		b.WriteString(fmt.Sprintf("%q,", addr.City))
-	} else if addr.Town != "" {
-		b.WriteString(fmt.Sprintf("%q,", addr.Town))
-	} else if addr.Neighbourhood != "" {
-		b.WriteString(fmt.Sprintf("%q,", addr.Neighbourhood))
-	} else {
-		b.WriteString(fmt.Sprintf("%q,", addr.State))
-	}
+	b.WriteString(fmt.Sprintf("%q,", GetBestCity(addr)))
 	b.WriteString(fmt.Sprintf("%q,", addr.Neighbourhood))
 	b.WriteString(fmt.Sprintf("%q,", addr.State))
 	b.WriteString(fmt.Sprintf("%q,", addr.Postcode))
@@ -177,6 +182,20 @@ func printCSV(f *os.File, tp TrackPoint, res Result) {
 	b.WriteString(fmt.Sprintf("\n"))
 
 	f.WriteString(b.String())
+}
+
+func GetBestCity(addr Address) string {
+	if addr.Village != "" {
+		return addr.Village
+	} else if addr.City != "" {
+		return addr.City
+	} else if addr.Town != "" {
+		return addr.Town
+	} else if addr.Neighbourhood != "" {
+		return addr.Neighbourhood
+	} else {
+		return addr.State
+	}
 }
 
 type Result struct {
