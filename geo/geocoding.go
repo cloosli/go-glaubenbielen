@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"encoding/xml"
 	"errors"
 	"flag"
 	"fmt"
@@ -11,7 +10,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/cloosli/go-glaubenbielen/util"
@@ -31,16 +29,7 @@ func run() error {
 		return errors.New("filename: not a valid gpx file")
 	}
 
-	xmlFile, err := os.Open(flagFilename)
-	if err != nil {
-		fmt.Println("Error opening file:", err)
-		return err
-	}
-	defer xmlFile.Close()
-
-	var q gpx.Query
-	decoder := xml.NewDecoder(xmlFile)
-	err = decoder.Decode(&q)
+	q, err := gpx.ParseGpx(flagFilename)
 	if err != nil {
 		return err
 	}
@@ -52,7 +41,7 @@ func run() error {
 			flagOutput = strings.TrimSuffix(flagFilename, "gpx") + "csv"
 		}
 	}
-	createFile(flagOutput)
+	util.CreateFile(flagOutput)
 
 	f, err := os.OpenFile(flagOutput, os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
@@ -78,8 +67,8 @@ func run() error {
 				log.Fatal(err)
 			}
 			q := u.Query()
-			q.Set("lat", floatToString(trackPoint.Lat))
-			q.Set("lon", floatToString(trackPoint.Lon))
+			q.Set("lat", util.FloatToString(trackPoint.Lat))
+			q.Set("lon", util.FloatToString(trackPoint.Lon))
 			u.RawQuery = q.Encode()
 
 			var res Result
@@ -107,15 +96,6 @@ func run() error {
 	fmt.Printf("CSV file created > %s\n", f.Name())
 
 	return nil
-}
-
-func createFile(p string) {
-	util.CreatePathTo(p)
-	f, err := os.Create(p)
-	if err != nil {
-		panic(err)
-	}
-	defer f.Close()
 }
 
 func printCSV(f *os.File, tp gpx.TrackPoint, res Result) {
@@ -170,10 +150,6 @@ type Address struct {
 	Country       string
 }
 
-func floatToString(input_num float64) string {
-	// to convert a float number to a string
-	return strconv.FormatFloat(input_num, 'f', 8, 64)
-}
 func getJson(url string, target interface{}) error {
 	r, err := http.Get(url)
 	if err != nil {
