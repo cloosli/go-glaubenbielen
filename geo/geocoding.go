@@ -77,7 +77,7 @@ func run() error {
 				log.Fatal(err)
 			}
 
-			city := GetBestCity(res.Address)
+			city := res.Address.GetBestCity()
 			set[city] = true
 
 			printCSV(f, trackPoint, res)
@@ -110,7 +110,7 @@ func printCSV(f *os.File, tp gpx.TrackPoint, res Result) {
 	b.WriteString(fmt.Sprintf("%q,", addr.Village))
 	b.WriteString(fmt.Sprintf("%q,", addr.City))
 	b.WriteString(fmt.Sprintf("%q,", addr.Town))
-	b.WriteString(fmt.Sprintf("%q,", GetBestCity(addr)))
+	b.WriteString(fmt.Sprintf("%q,", addr.GetBestCity()))
 	b.WriteString(fmt.Sprintf("%q,", addr.Neighbourhood))
 	b.WriteString(fmt.Sprintf("%q,", addr.State))
 	b.WriteString(fmt.Sprintf("%q,", addr.Postcode))
@@ -121,7 +121,7 @@ func printCSV(f *os.File, tp gpx.TrackPoint, res Result) {
 	f.WriteString(b.String())
 }
 
-func GetBestCity(addr Address) string {
+func (addr *Address) GetBestCity() string {
 	if addr.Village != "" {
 		return addr.Village
 	} else if addr.City != "" {
